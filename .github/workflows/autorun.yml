@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "input.xlsx"
-      - "url_auditor_config.xml"
   workflow_dispatch:   # allow manual trigger from GitHub Actions UI
 
 permissions:
@@ -71,17 +68,27 @@ jobs:
             Write-Error "No output folder found after audit"
             exit 1
           }
-          $dest = Join-Path $env:GITHUB_WORKSPACE $outputFolder.Name
-          Copy-Item $outputFolder.FullName $dest -Recurse -Force
-          echo "OUTPUT_FOLDER=$($outputFolder.Name)" >> $env:GITHUB_ENV
-          echo "Output: $($outputFolder.Name)"
+          # Extract date-time suffix from folder name (e.g. output_2026-06-17_11-50-29 -> 2026-06-17_11-50-29)
+          $dateTimeSuffix = $outputFolder.Name -replace '^output_', ''
+
+          # Ensure fixed audit_output folder exists in workspace
+          $destDir = Join-Path $env:GITHUB_WORKSPACE "audit_output"
+          New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+
+          # Copy each file into audit_output, prefixing filename with date-time
+          Get-ChildItem $outputFolder.FullName -File | ForEach-Object {
+            $newName = "${dateTimeSuffix}_$($_.Name)"
+            Copy-Item $_.FullName (Join-Path $destDir $newName) -Force
+            echo "Copied: $newName"
+          }
+          echo "DATE_TIME_SUFFIX=$dateTimeSuffix" >> $env:GITHUB_ENV
 
       - name: Commit output
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$env:OUTPUT_FOLDER"
+          git add "audit_output"
           git diff --cached --quiet && echo "Nothing to commit" && exit 0
-          git commit -m "audit: $env:OUTPUT_FOLDER"
+          git commit -m "audit: output_$env:DATE_TIME_SUFFIX"
           git pull --rebase origin main
           git push
