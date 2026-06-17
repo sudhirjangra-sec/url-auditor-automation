@@ -43,4 +43,6 @@
         <sign>access denied</sign>
         <sign>Just a moment...</sign>
     </cf_signs>
+    <url_column>URL</url_column>
+    <status_column>Status_9AM</status_column>
 </url_auditor_config>
