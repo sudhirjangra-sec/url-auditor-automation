@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<url_auditor_config>
+    <skip_domains>
+        <domain>fgov.be</domain>
+        <domain>go.cr</domain>
+        <domain>gob.do</domain>
+        <domain>gob.ma</domain>
+        <domain>go.th</domain>
+        <domain>cesko.ge</domain>
+        <domain>cne.hn</domain>
+    </skip_domains>
+    <bad_titles>
+        <title>404</title>
+        <title>page not found</title>
+        <title>access to the website is blocked</title>
+        <title>privacy error</title>
+        <title>Attention Required! | Cloudflare</title>
+        <title>service unavailable</title>
+        <title>500</title>
+        <title>502</title>
+        <title>internal server error</title>
+        <title>bad gateway</title>
+        <title>temporarily unavailable</title>
+        <title>site can't be reached</title>
+        <title>domain expired</title>
+        <title>under maintenance</title>
+        <title>403 forbidden</title>
+        <title>access denied</title>
+        <title>iis windows server</title>
+        <title>default page</title>
+        <title>just another wordpress site</title>
+        <title>Problem loading page</title>
+    </bad_titles>
+    <cf_signs>
+        <sign>checking your browser</sign>
+        <sign>please stand by</sign>
+        <sign>verify you are human</sign>
+        <sign>security check</sign>
+        <sign>attention required</sign>
+        <sign>cf-browser-verification</sign>
+        <sign>cloudflare</sign>
+        <sign>incapsula</sign>
+        <sign>access denied</sign>
+        <sign>Just a moment...</sign>
+    </cf_signs>
+</url_auditor_config>
