@@ -55,9 +55,10 @@ jobs:
         run: |
           Set-Location $env:AUDITOR_DIR
           & ".\URL Auditor Auto.exe"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Audit failed with exit code $LASTEXITCODE"
-            exit $LASTEXITCODE
+          $exitCode = $LASTEXITCODE
+          echo "AUDIT_EXIT_CODE=$exitCode" >> $env:GITHUB_ENV
+          if ($exitCode -ne 0) {
+            Write-Warning "Audit exited with code $exitCode - will still attempt to save any partial output"
           }
 
       - name: Copy output back to repo
@@ -65,8 +66,8 @@ jobs:
           # Find the output_* folder created by the audit
           $outputFolder = Get-ChildItem $env:AUDITOR_DIR -Filter "output_*" -Directory | Sort-Object Name | Select-Object -Last 1
           if (-not $outputFolder) {
-            Write-Error "No output folder found after audit"
-            exit 1
+            Write-Warning "No output folder found after audit - skipping copy"
+            exit 0
           }
           # Extract date-time suffix from folder name (e.g. output_2026-06-17_11-50-29 -> 2026-06-17_11-50-29)
           $dateTimeSuffix = $outputFolder.Name -replace '^output_', ''
@@ -92,3 +93,9 @@ jobs:
           git commit -m "audit: output_$env:DATE_TIME_SUFFIX"
           git pull --rebase origin main
           git push
+
+      - name: Fail if audit crashed
+        if: ${{ env.AUDIT_EXIT_CODE != '0' && env.AUDIT_EXIT_CODE != '' }}
+        run: |
+          Write-Error "Audit failed with exit code $env:AUDIT_EXIT_CODE"
+          exit 1
