@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'input.xlsx'
   workflow_dispatch:   # allow manual trigger from GitHub Actions UI
 
 permissions:
@@ -18,31 +20,62 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # full history for clean commit
+          fetch-depth: 0
 
-      - name: Download latest URL Auditor Auto EXE
+      - name: Fetch Latest Release Info
+        id: fetch_release
         env:
           GH_TOKEN: ${{ secrets.AUDITOR_REPO_TOKEN }}
         run: |
-          $release = Invoke-RestMethod `
-            -Uri "https://api.github.com/repos/sudhirjangra/url-auditor-pro/releases/latest" `
-            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "url-auditor-auto" }
+          try {
+            $release = Invoke-RestMethod `
+              -Uri "https://api.github.com/repos/sudhirjangra/url-auditor-pro/releases/latest" `
+              -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "url-auditor-auto" }
+            
+            $asset = $release.assets | Where-Object { $_.name -like "URL-Auditor-Auto-*.zip" } | Select-Object -First 1
+            if (-not $asset) { throw "Asset ZIP file not found in the latest release." }
 
-          $asset = $release.assets | Where-Object { $_.name -like "URL-Auditor-Auto-*.zip" } | Select-Object -First 1
-          if (-not $asset) {
-            Write-Error "URL-Auditor-Auto ZIP not found in latest release"
-            exit 1
+            echo "RELEASE_TAG=$($release.tag_name)" >> $env:GITHUB_ENV
+            echo "DOWNLOAD_URL=$($asset.browser_download_url)" >> $env:GITHUB_ENV
+            echo "ASSET_NAME=$($asset.name)" >> $env:GITHUB_ENV
+            echo "FETCH_SUCCESS=true" >> $env:GITHUB_ENV
+          } catch {
+            Write-Warning "Could not fetch details from private repo: $_. Will attempt fallback to cached version."
+            echo "FETCH_SUCCESS=false" >> $env:GITHUB_ENV
+            echo "RELEASE_TAG=fallback" >> $env:GITHUB_ENV
           }
 
-          echo "Downloading $($asset.name) from $($asset.browser_download_url)"
+      - name: Cache URL Auditor EXE
+        id: cache_auditor
+        uses: actions/cache@v4
+        with:
+          path: auditor
+          key: auditor-exe-${{ env.RELEASE_TAG }}
+          restore-keys: |
+            auditor-exe-
+
+      - name: Download and Extract (Cache Miss)
+        if: steps.cache_auditor.outputs.cache-hit != 'true' && env.FETCH_SUCCESS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AUDITOR_REPO_TOKEN }}
+        run: |
+          echo "Downloading $env:ASSET_NAME..."
           Invoke-WebRequest `
-            -Uri $asset.browser_download_url `
+            -Uri $env:DOWNLOAD_URL `
             -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "url-auditor-auto" } `
             -OutFile "auditor.zip"
-
           Expand-Archive -Path "auditor.zip" -DestinationPath "auditor" -Force
+          Remove-Item "auditor.zip"
+
+      - name: Verify Auditor Availability
+        run: |
+          if (-not (Test-Path "auditor")) {
+            Write-Error "Auditor executable could not be found! (API failed and no cached version exists)"
+            exit 1
+          }
           echo "AUDITOR_DIR=$((Get-Item auditor).FullName)" >> $env:GITHUB_ENV
-          echo "EXE extracted to: $(Get-ChildItem auditor)"
+          echo "Auditor folder ready. Contents:"
+          Get-ChildItem auditor
 
       - name: Copy input files to auditor folder
         run: |
@@ -63,20 +96,15 @@ jobs:
 
       - name: Copy output back to repo
         run: |
-          # Find the output_* folder created by the audit
           $outputFolder = Get-ChildItem $env:AUDITOR_DIR -Filter "output_*" -Directory | Sort-Object Name | Select-Object -Last 1
           if (-not $outputFolder) {
             Write-Warning "No output folder found after audit - skipping copy"
             exit 0
           }
-          # Extract date-time suffix from folder name (e.g. output_2026-06-17_11-50-29 -> 2026-06-17_11-50-29)
           $dateTimeSuffix = $outputFolder.Name -replace '^output_', ''
-
-          # Ensure fixed audit_output folder exists in workspace
           $destDir = Join-Path $env:GITHUB_WORKSPACE "audit_output"
           New-Item -ItemType Directory -Force -Path $destDir | Out-Null
-
-          # Copy each file into audit_output, prefixing filename with date-time
+          
           Get-ChildItem $outputFolder.FullName -File | ForEach-Object {
             $newName = "${dateTimeSuffix}_$($_.Name)"
             Copy-Item $_.FullName (Join-Path $destDir $newName) -Force
