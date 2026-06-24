@@ -36,7 +36,7 @@ jobs:
             if (-not $asset) { throw "Asset ZIP file not found in the latest release." }
 
             echo "RELEASE_TAG=$($release.tag_name)" >> $env:GITHUB_ENV
-            echo "DOWNLOAD_URL=$($asset.browser_download_url)" >> $env:GITHUB_ENV
+            echo "ASSET_ID=$($asset.id)" >> $env:GITHUB_ENV
             echo "ASSET_NAME=$($asset.name)" >> $env:GITHUB_ENV
             echo "FETCH_SUCCESS=true" >> $env:GITHUB_ENV
           } catch {
@@ -61,8 +61,8 @@ jobs:
         run: |
           echo "Downloading $env:ASSET_NAME..."
           Invoke-WebRequest `
-            -Uri $env:DOWNLOAD_URL `
-            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "url-auditor-auto" } `
+            -Uri "https://api.github.com/repos/sudhirjangra/url-auditor-pro/releases/assets/$env:ASSET_ID" `
+            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "url-auditor-auto"; Accept = "application/octet-stream" } `
             -OutFile "auditor.zip"
           Expand-Archive -Path "auditor.zip" -DestinationPath "auditor" -Force
           Remove-Item "auditor.zip"
