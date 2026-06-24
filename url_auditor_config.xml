@@ -8,6 +8,7 @@
         <domain>go.th</domain>
         <domain>cesko.ge</domain>
         <domain>cne.hn</domain>
+		<domain>org.gt</domain>
     </skip_domains>
     <bad_titles>
         <title>404</title>
